@@ -2,25 +2,29 @@
 //
 // startup_ccs.c - Startup code for use with TI's Code Composer Studio.
 //
-// Copyright (c) 2012 Texas Instruments Incorporated.  All rights reserved.
+// Copyright (c) 2012-2013 Texas Instruments Incorporated.  All rights reserved.
 // Software License Agreement
-//
+// 
 // Texas Instruments (TI) is supplying this software for use solely and
 // exclusively on TI's microcontroller products. The software is owned by
 // TI and/or its suppliers, and is protected under applicable copyright
 // laws. You may not combine this software with "viral" open-source
 // software in order to form a larger program.
-//
+// 
 // THIS SOFTWARE IS PROVIDED "AS IS" AND WITH ALL FAULTS.
 // NO WARRANTIES, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT
 // NOT LIMITED TO, IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
 // A PARTICULAR PURPOSE APPLY TO THIS SOFTWARE. TI SHALL NOT, UNDER ANY
 // CIRCUMSTANCES, BE LIABLE FOR SPECIAL, INCIDENTAL, OR CONSEQUENTIAL
 // DAMAGES, FOR ANY REASON WHATSOEVER.
-//
-// This is part of revision 9453 of the EK-LM4F120XL Firmware Package.
+// 
+// This is part of revision 1.0 of the EK-TM4C123GXL Firmware Package.
 //
 //*****************************************************************************
+
+#include <stdint.h>
+#include "inc/hw_nvic.h"
+#include "inc/hw_types.h"
 
 //*****************************************************************************
 //
@@ -45,7 +49,7 @@ extern void _c_int00(void);
 // Linker variable that marks the top of the stack.
 //
 //*****************************************************************************
-extern unsigned long __STACK_TOP;
+extern uint32_t __STACK_TOP;
 
 //*****************************************************************************
 //
@@ -53,8 +57,11 @@ extern unsigned long __STACK_TOP;
 //
 //*****************************************************************************
 extern void SysTickIntHandler(void);
-extern void UARTStdioIntHandler(void);
+//extern void USBUARTIntHandler(void);
 extern void USB0DeviceIntHandler(void);
+
+extern void UARTStdioIntHandler(void);
+
 
 //*****************************************************************************
 //
@@ -66,7 +73,7 @@ extern void USB0DeviceIntHandler(void);
 #pragma DATA_SECTION(g_pfnVectors, ".intvecs")
 void (* const g_pfnVectors[])(void) =
 {
-    (void (*)(void))((unsigned long)&__STACK_TOP),
+    (void (*)(void))((uint32_t)&__STACK_TOP),
                                             // The initial stack pointer
     ResetISR,                               // The reset handler
     NmiSR,                                  // The NMI handler
@@ -82,13 +89,13 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // Debug monitor handler
     0,                                      // Reserved
     IntDefaultHandler,                      // The PendSV handler
-    IntDefaultHandler,                      // The SysTick handler
+    IntDefaultHandler, 						// The SysTick handler
     IntDefaultHandler,                      // GPIO Port A
     IntDefaultHandler,                      // GPIO Port B
     IntDefaultHandler,                      // GPIO Port C
     IntDefaultHandler,                      // GPIO Port D
     IntDefaultHandler,                      // GPIO Port E
-    IntDefaultHandler,                    // UART0 Rx and Tx
+    UARTStdioIntHandler,                    // UART0 Rx and Tx
     IntDefaultHandler,                      // UART1 Rx and Tx
     IntDefaultHandler,                      // SSI0 Rx and Tx
     IntDefaultHandler,                      // I2C0 Master and Slave
@@ -125,7 +132,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // CAN0
     IntDefaultHandler,                      // CAN1
     IntDefaultHandler,                      // CAN2
-    IntDefaultHandler,                      // Ethernet
+    0,                                      // Reserved
     IntDefaultHandler,                      // Hibernate
     USB0DeviceIntHandler,                   // USB0
     IntDefaultHandler,                      // PWM Generator 3
@@ -135,8 +142,8 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // ADC1 Sequence 1
     IntDefaultHandler,                      // ADC1 Sequence 2
     IntDefaultHandler,                      // ADC1 Sequence 3
-    IntDefaultHandler,                      // I2S0
-    IntDefaultHandler,                      // External Bus Interface 0
+    0,                                      // Reserved
+    0,                                      // Reserved
     IntDefaultHandler,                      // GPIO Port J
     IntDefaultHandler,                      // GPIO Port K
     IntDefaultHandler,                      // GPIO Port L
@@ -190,14 +197,14 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // Wide Timer 5 subtimer A
     IntDefaultHandler,                      // Wide Timer 5 subtimer B
     IntDefaultHandler,                      // FPU
-    IntDefaultHandler,                      // PECI 0
-    IntDefaultHandler,                      // LPC 0
+    0,                                      // Reserved
+    0,                                      // Reserved
     IntDefaultHandler,                      // I2C4 Master and Slave
     IntDefaultHandler,                      // I2C5 Master and Slave
     IntDefaultHandler,                      // GPIO Port M
     IntDefaultHandler,                      // GPIO Port N
     IntDefaultHandler,                      // Quadrature Encoder 2
-    IntDefaultHandler,                      // Fan 0
+    0,                                      // Reserved
     0,                                      // Reserved
     IntDefaultHandler,                      // GPIO Port P (Summary or P0)
     IntDefaultHandler,                      // GPIO Port P1

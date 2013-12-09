@@ -1,8 +1,8 @@
 /******************************************************************************
  *
- * Default Linker Command file for the Texas Instruments LM4F120H5QR
+ * Default Linker Command file for the Texas Instruments TM4C123GH6PM
  *
- * This is part of revision 9102 of the Stellaris Peripheral Driver Library.
+ * This is derived from revision 10691 of the TivaWare Library.
  *
  *****************************************************************************/
 
@@ -33,6 +33,7 @@ SECTIONS
     .const  :   > FLASH
     .cinit  :   > FLASH
     .pinit  :   > FLASH
+    .init_array : > FLASH
 
     .vtable :   > 0x20000000
     .data   :   > SRAM
@@ -41,4 +42,4 @@ SECTIONS
     .stack  :   > SRAM
 }
 
-__STACK_TOP = __stack + 256;
+__STACK_TOP = __stack + 512;

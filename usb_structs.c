@@ -3,7 +3,10 @@
  *
  *  Created on: 31 dec. 2012
  *      Author: Frans-Willem
+ *      Minor tweak for Tivaware compatibility by Richard Aplin, Dec2013
  */
+#include <stdbool.h>	//tivaware tweak
+#include <stdint.h>
 
 #include "inc/hw_types.h"
 #include "driverlib/usb.h"
@@ -80,9 +83,12 @@ const unsigned char * const g_pStringDescriptors[] =
 // function and the callback data set to our bulk instance structure.
 //
 //*****************************************************************************
-tBulkInstance g_sBulkInstance;
 
-const tUSBDBulkDevice g_sBulkDevice =
+//Tivaware mods see http://www.ti.com/lit/an/spma050a/spma050a.pdf section 3.7.2
+//Don't need tBulkInstance
+//? tBulkInstance g_sBulkInstance;
+
+tUSBDBulkDevice g_sBulkDevice =
 {
     0x0a12, //VID
     0x0042, //PID
@@ -94,5 +100,7 @@ const tUSBDBulkDevice g_sBulkDevice =
     (void *)0,
     g_pStringDescriptors,
     NUM_STRING_DESCRIPTORS,
-    &g_sBulkInstance
+//    &g_sBulkInstance  //removed for tivaware
 };
+
+

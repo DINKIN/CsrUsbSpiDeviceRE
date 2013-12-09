@@ -20,4 +20,5 @@ void CsrSpiWrite(unsigned short nAddress, unsigned short nLength, unsigned short
 int CsrSpiIsStopped();
 int CsrSpiBcOperation(unsigned short nOperation);
 int CsrSpiBcCmd(unsigned short nLength, unsigned short *pnData);
+void CsrSpiEnableFastMode(void);
 #endif /* CSRSPI_H_ */

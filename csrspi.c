@@ -2,8 +2,11 @@
  * csrspi.c
  *
  *  Created on: 2 jan. 2013
- *      Author: Frans-Willem
+ *      Author: Frans-Willem,
+ *      	very small tweaks by Richard Aplin, Frans did all the hard work :-)
  */
+#include <stdbool.h>
+#include <stdint.h>
 #include "inc/hw_ints.h"
 #include "inc/hw_memmap.h"
 #include "inc/hw_types.h"
@@ -35,6 +38,7 @@ unsigned short g_nWriteBits = 0;
 unsigned short g_nBcA = 0;
 unsigned short g_nBcB = 0;
 unsigned short g_nUseSpecialRead = 0;
+unsigned short g_nFastSpiMode=0;
 
 void CsrInit() {
 	//Initialize Port B
@@ -43,8 +47,24 @@ void CsrInit() {
     GPIOPadConfigSet(PORT_BASE, PIN_MISO, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU);
 }
 
+void CsrSpiEnableFastMode(void)
+{
+	//Richard Aplin tweak for super fast flashing (optional; test it with BlueFlash first!)
+	//Enabled by holding down left button on Launchpad board when it's powered up
+	//Without this, BlueFlash does about 2sectors/sec (65sec to dump 8mbits)
+	//WITH this it does about 5/sec (26sec to dump 8mbit)
+	//Works fine for me, but...
+	//TEST ON YOUR OWN CHIP WITH BLUEFLASH DUMP/ERASE/VERIFY BEFORE REGULAR USE
+	g_nFastSpiMode=1;
+}
+
+
 void CsrSpiDelay() {
-	int kHz = 1000000 / (126 * g_nSpeed + 434);
+	int kHz;
+
+	if (g_nSpeed==4 && g_nFastSpiMode) return; //if usb host has specified 'fast' mode (Setspeed 0x0004) use practically no delay - works fine for me, but YMMV!
+
+	kHz = 1000000 / (126 * g_nSpeed + 434);
 	//Used to be 3000
 	ROM_SysCtlDelay((SysCtlClockGet()/6000)/kHz);
 }

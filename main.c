@@ -1,3 +1,18 @@
+/*
+ *    Author: Frans-Willem
+ *      Minor tweak for Tivaware compatibility by Richard Aplin, Dec2013
+ *
+ *    This version runs on TI Tiva C series Launchpad - part # TM4C123G , costs USD$12 at time of writing, CSR dongle costs ~$250
+ *
+ *    Connect:
+ *
+ *
+ */
+
+//two new includes for Tivaware types
+#include <stdbool.h>
+#include <stdint.h>
+
 #include "inc/hw_ints.h"
 #include "inc/hw_memmap.h"
 #include "inc/hw_types.h"
@@ -20,15 +35,27 @@
 #include "usb_structs.h"
 #include "csrspi.h"
 
+
 #define SYSCTL_PERIPH_LEDS	SYSCTL_PERIPH_GPIOF
 #define GPIO_PORT_LEDS_BASE	GPIO_PORTF_BASE
 #define GPIO_PIN_LED_R		GPIO_PIN_1
 #define GPIO_PIN_LED_G		GPIO_PIN_3
 #define GPIO_PIN_LED_B		GPIO_PIN_2
 
+#define BUTTONS_GPIO_PERIPH     SYSCTL_PERIPH_GPIOF
+#define BUTTONS_GPIO_BASE       GPIO_PORTF_BASE
+#define NUM_BUTTONS             2
+#define LEFT_BUTTON             GPIO_PIN_4
+#define RIGHT_BUTTON            GPIO_PIN_0
+#define ALL_BUTTONS             (LEFT_BUTTON | RIGHT_BUTTON)
+
 #define BUFFER_SIZE	1024
 
-typedef unsigned int size_t;
+#define CPU_CLOCK_100MHZ	//else 80mhz, both work for me
+
+//#define PRINT_PROTOCOL 1	//debug info
+
+//typedef unsigned int size_t;	//removed for tivaware
 
 unsigned char pReceiveBuffer[BUFFER_SIZE];
 volatile size_t nReceiveLength;
@@ -113,39 +140,102 @@ void WaitTransmit() {
 	nTransmitLength = nTransmitOffset = 0;
 }
 
+
+//*****************************************************************************
+//
+// Configure the UART and its pins.  This must be called before UARTprintf().
+// (Tivaware tweak)
+//*****************************************************************************
+void
+ConfigureUART(void)
+{
+    //
+    // Enable the GPIO Peripheral used by the UART.
+    //
+    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+
+    //
+    // Enable UART0
+    //
+    ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
+
+    //
+    // Configure GPIO Pins for UART mode.
+    //
+    ROM_GPIOPinConfigure(GPIO_PA0_U0RX);
+    ROM_GPIOPinConfigure(GPIO_PA1_U0TX);
+    ROM_GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
+
+    //
+    // Use the internal 16MHz oscillator as the UART clock source.
+    //
+    UARTClockSourceSet(UART0_BASE, UART_CLOCK_PIOSC);
+
+    //
+    // Initialize the UART for console I/O.
+    //
+    UARTStdioConfig(0, 115200, 16000000);
+}
+
+void InitButtons(void)
+{
+	// Set each of the button GPIO pins as an input with a pull-up.
+	ROM_GPIODirModeSet(BUTTONS_GPIO_BASE, ALL_BUTTONS, GPIO_DIR_MODE_IN);
+	ROM_GPIOPadConfigSet(BUTTONS_GPIO_BASE, ALL_BUTTONS,
+	                         GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU);
+}
+
 /*
  * main.c
  */
 void main(void) {
 	size_t nOffset;
 	unsigned short nCommand, nArgs[4];
+	uint32_t buttons;
 
+#ifndef CPU_CLOCK_100MHZ
 	//Set Clock at 80MHz
 	ROM_SysCtlClockSet(SYSCTL_SYSDIV_2_5 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
+#else
+	//Hey what the hell, let's run at 100Mhz, why not?
+	ROM_SysCtlClockSet(SYSCTL_SYSDIV_2 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
+#endif
 	//Enable UART on Port A
 	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
 	GPIOPinConfigure(GPIO_PA0_U0RX);
 	GPIOPinConfigure(GPIO_PA1_U0TX);
 	ROM_GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
 	//Do some output!
-	UARTStdioInit(0);
-	UARTprintf("CSR USB-SPI Emulator running!\n");
+	ConfigureUART(); //UARTStdioInit(0);	tivaware tweak
+	UARTprintf("CSR USB-SPI Emulator for Tiva Launchpad by Frans-Willem 2012,\n tweaked by Richard Aplin 2013\n");
+
+	UARTprintf("CPU Clock %dMhz\n",SysCtlClockGet()/1000000);
+
 	//Csr SPI init
 	CsrInit();
 	UARTprintf("CSR initialized\n");
 
 	//Status LEDs Init
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_LEDS);
+	InitButtons();
 	GPIOPinTypeGPIOOutput(GPIO_PORT_LEDS_BASE, GPIO_PIN_LED_R|GPIO_PIN_LED_G|GPIO_PIN_LED_B);
 	GPIOPinWrite(GPIO_PORT_LEDS_BASE, GPIO_PIN_LED_R|GPIO_PIN_LED_G|GPIO_PIN_LED_B, 0);
 	UARTprintf("LEDs initialized\n");
 
+	//check for left button (NOT) being held down on boot for FAST mode
+	buttons=ROM_GPIOPinRead(BUTTONS_GPIO_BASE, LEFT_BUTTON);
+	if (!buttons){
+		UARTprintf("FAST SPI mode enabled - test reliability with BlueFlash before using!\n");
+		CsrSpiEnableFastMode();
+	}else{
+		UARTprintf("Regular (slow) SPI mode enabled\n");
+	}
 
 	//USB init?
 	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
 	ROM_GPIOPinTypeUSBAnalog(GPIO_PORTD_BASE, GPIO_PIN_4 | GPIO_PIN_5);
 
-    USBStackModeSet(0, USB_MODE_FORCE_DEVICE, 0);
+	USBStackModeSet(0, eUSBModeForceDevice, 0);	//tivaware tweak
     USBDBulkInit(0, (tUSBDBulkDevice *)&g_sBulkDevice);
     UARTprintf("Waiting for host...\n");
 
@@ -171,6 +261,9 @@ void main(void) {
 							nOffset += 2;
 							nArgs[1] = ReadWord(&pReceiveBuffer[nOffset]);
 							nOffset += 2;
+#if PRINT_PROTOCOL
+							UARTprintf("CMD_READ %04x %04x\n",nArgs[0],nArgs[1]);
+#endif
 							CmdRead(nArgs[0], nArgs[1]);
 						}
 						break;
@@ -185,6 +278,9 @@ void main(void) {
 							if (nReceiveLength < nOffset + (nArgs[1] * 2)) {
 								UARTprintf("Too few arguments to write\n");
 							} else {
+#if PRINT_PROTOCOL
+								UARTprintf("CMD_WRITE %04x %04x\n",nArgs[0],nArgs[1]);
+#endif
 								CmdWrite(nArgs[0], nArgs[1], &pReceiveBuffer[nOffset]);
 								nOffset+=nArgs[1] * 2;
 							}
@@ -196,6 +292,9 @@ void main(void) {
 						} else {
 							nArgs[0] = ReadWord(&pReceiveBuffer[nOffset]);
 							nOffset += 2;
+#if PRINT_PROTOCOL
+							UARTprintf("CMD_SETSPEED %04x\n",nArgs[0]);
+#endif
 							CmdSetSpeed(nArgs[0]);
 						}
 						break;
@@ -206,6 +305,9 @@ void main(void) {
 						CmdGetSpeed();
 						break;
 					case CMD_UPDATE:
+#if PRINT_PROTOCOL
+						UARTprintf("CMD_UPDATE\n");
+#endif
 						CmdUpdate();
 						break;
 					case CMD_GETSERIAL:
@@ -220,6 +322,9 @@ void main(void) {
 						} else {
 							nArgs[0] = ReadWord(&pReceiveBuffer[nOffset]);
 							nOffset += 2;
+#if PRINT_PROTOCOL
+							UARTprintf("CMD_SETMODE %04x\n",nArgs[0]);
+#endif
 							CmdSetMode(nArgs[0]);
 						}
 						break;
@@ -231,6 +336,9 @@ void main(void) {
 							nOffset += 2;
 							nArgs[1] = ReadWord(&pReceiveBuffer[nOffset]);
 							nOffset += 2;
+#if PRINT_PROTOCOL
+							UARTprintf("CMD_SETBITS %04x %04x\n",nArgs[0],nArgs[1]);
+#endif
 							CmdSetBits(nArgs[0], nArgs[1]);
 						}
 						break;
@@ -242,6 +350,9 @@ void main(void) {
 							nOffset += 2;
 							nArgs[1] = ReadWord(&pReceiveBuffer[nOffset]);
 							nOffset += 2;
+#if PRINT_PROTOCOL
+							UARTprintf("CMD_BCCMDINIT %04x %04x\n",nArgs[0],nArgs[1]);
+#endif
 							CmdBcCmdInit(nArgs[0], nArgs[1]);
 						}
 						break;
@@ -254,6 +365,9 @@ void main(void) {
 							if (nReceiveLength < nOffset + (nArgs[0] * 2)) {
 								UARTprintf("Too few arguments to bccmd\n");
 							} else {
+#if PRINT_PROTOCOL
+								UARTprintf("CMD_BCCMD %04x\n",nArgs[0]);
+#endif
 								CmdBcCmd(nArgs[0], &pReceiveBuffer[nOffset]);
 								nOffset+=nArgs[0] * 2;
 							}
@@ -277,9 +391,11 @@ void main(void) {
 	}
 }
 
-unsigned long
+uint32_t TxHandler(void *pvi32CBData, uint32_t ulEvent,
+                          uint32_t ulMsgValue, void *pvMsgData)
+/*unsigned long
 TxHandler(void *pvCBData, unsigned long ulEvent, unsigned long ulMsgValue,
-          void *pvMsgData)
+          void *pvMsgData)*/
 {
     if(ulEvent == USB_EVENT_TX_COMPLETE)
     {
@@ -389,7 +505,9 @@ int CmdBcCmd(unsigned short nLength, unsigned char *pData) {
 	return 1;
 }
 
-unsigned long RxHandler(void *pvCBData, unsigned long ulEvent, unsigned long ulMsgValue, void *pvMsgData)
+uint32_t RxHandler(void *pvCBData, uint32_t ulEvent,
+                          uint32_t ulMsgValue, void *pvMsgData)
+//unsigned long RxHandler(void *pvCBData, unsigned long ulEvent, unsigned long ulMsgValue, void *pvMsgData)
 {
     switch(ulEvent)
     {
